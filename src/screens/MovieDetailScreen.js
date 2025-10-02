@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {colors} from '../constants/colors';
+import {getImageSource} from '../utils/imageUtils';
 
 const {width} = Dimensions.get('window');
 
@@ -24,7 +25,11 @@ const MovieDetailScreen = ({navigation, route}) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Banner */}
         <View style={styles.bannerContainer}>
-          <Image source={{uri: movie.banner}} style={styles.bannerImage} />
+          <Image 
+            source={getImageSource(movie.poster_url || movie.thumb_url, true)} 
+            style={styles.bannerImage} 
+            onError={() => console.log('❌ Banner image load error for:', movie.name)}
+          />
           <LinearGradient
             colors={colors.gradientOverlay}
             style={styles.bannerOverlay}
@@ -38,26 +43,28 @@ const MovieDetailScreen = ({navigation, route}) => {
 
         {/* Movie Info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.title}>{movie.title}</Text>
+          <Text style={styles.title}>{movie.name || movie.origin_name}</Text>
           
           <View style={styles.metaContainer}>
             <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>⭐ {movie.rating}</Text>
+              <Text style={styles.metaLabel}>⭐ {movie.year || 'N/A'}</Text>
             </View>
             <View style={styles.metaDivider} />
             <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>{movie.year}</Text>
+              <Text style={styles.metaLabel}>{movie.country?.[0]?.name || 'N/A'}</Text>
             </View>
             <View style={styles.metaDivider} />
             <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>{movie.duration}</Text>
+              <Text style={styles.metaLabel}>{movie.episode_current || movie.type || 'N/A'}</Text>
             </View>
           </View>
 
           <View style={styles.genresContainer}>
-            {movie.genre.map((genre, index) => (
+            {(movie.category || movie.genre || []).map((item, index) => (
               <View key={index} style={styles.genreChip}>
-                <Text style={styles.genreText}>{genre}</Text>
+                <Text style={styles.genreText}>
+                  {typeof item === 'object' ? item.name : item}
+                </Text>
               </View>
             ))}
           </View>
@@ -92,7 +99,9 @@ const MovieDetailScreen = ({navigation, route}) => {
           {/* Description */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mô tả</Text>
-            <Text style={styles.description}>{movie.description}</Text>
+            <Text style={styles.description}>
+              {movie.content?.replace(/<[^>]*>/g, '') || movie.description || 'Mô tả chưa có sẵn.'}
+            </Text>
           </View>
 
           {/* Similar Movies */}

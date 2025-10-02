@@ -17,7 +17,7 @@ const AppNavigator = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Welcome"
+        initialRouteName="Home"
         screenOptions={{
           headerShown: false,
           cardStyle: {backgroundColor: 'transparent'},

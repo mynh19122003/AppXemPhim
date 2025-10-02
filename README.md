@@ -1,21 +1,33 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# App Xem Phim - MovieFlix
 
-# Getting Started
+Ứng dụng xem phim trên điện thoại được xây dựng với React Native, sử dụng react-native-linear-gradient cho giao diện đẹp mắt.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Tính năng
 
-## Step 1: Start Metro
+- 🎬 Màn hình chào mừng với thiết kế gradient đẹp mắt
+- 🔐 Đăng nhập / Đăng ký tài khoản
+- 📱 Xác thực OTP
+- 🏠 Trang chủ với danh sách phim
+- 🎥 Chi tiết phim với mô tả đầy đủ
+- 👤 Trang cá nhân người dùng
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Cài đặt
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### Yêu cầu
+
+- Node.js >= 18
+- React Native CLI
+- Android Studio (cho Android)
+- JDK 17
+
+## Chạy ứng dụng
+
+### Android
+
+1. Khởi động Metro Bundler:
 
 ```sh
-# Using npm
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
 ## Step 2: Build and run your app

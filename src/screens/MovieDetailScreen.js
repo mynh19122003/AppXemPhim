@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,27 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import {colors} from '../constants/colors';
 import {getImageSource} from '../utils/imageUtils';
+import EpisodeSelector from '../components/ui/EpisodeSelector';
 
 const {width} = Dimensions.get('window');
 
 const MovieDetailScreen = ({navigation, route}) => {
   const {movie} = route.params;
+  const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
+
+  const handlePlayMovie = () => {
+    console.log(`🎬 Playing movie: ${movie.name} (${movie.slug})`);
+    
+    // Luôn chuyển tới WatchMovieScreen để xem video và episodes
+    navigation.navigate('WatchMovie', { movie });
+  };
+
+  const handleEpisodeSelect = (episode) => {
+    navigation.navigate('WatchMovie', { 
+      movie, 
+      episodeSlug: episode.slug 
+    });
+  };
 
   return (
     <LinearGradient colors={colors.gradientStart} style={styles.container}>
@@ -70,7 +86,10 @@ const MovieDetailScreen = ({navigation, route}) => {
           </View>
 
           {/* Play Button */}
-          <TouchableOpacity style={styles.playButton}>
+          <TouchableOpacity 
+            style={styles.playButton}
+            onPress={handlePlayMovie}
+          >
             <LinearGradient
               colors={colors.gradientPrimary}
               style={styles.playButtonGradient}
@@ -122,6 +141,14 @@ const MovieDetailScreen = ({navigation, route}) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Episode Selector Modal */}
+      <EpisodeSelector
+        movie={movie}
+        visible={showEpisodeSelector}
+        onClose={() => setShowEpisodeSelector(false)}
+        onEpisodeSelect={handleEpisodeSelect}
+      />
     </LinearGradient>
   );
 };

@@ -14,6 +14,7 @@ export { latestMoviesService, LatestMoviesService } from './endpoints/latestMovi
 export { singleMoviesService, SingleMoviesService } from './endpoints/singleMovies'; 
 export { seriesMoviesService, SeriesMoviesService } from './endpoints/seriesMovies';
 export { animationMoviesService, AnimationMoviesService } from './endpoints/animationMovies';
+export { movieDetailService, MovieDetailService } from './endpoints/movieDetail';
 
 // Category Filters
 export { default as AnimeCategory } from './categories/anime';
@@ -31,6 +32,7 @@ export default {
   singleMoviesService,
   seriesMoviesService,
   animationMoviesService,
+  movieDetailService,
   AnimeCategory,
   UsUkCategory,
   KoreanCategory,

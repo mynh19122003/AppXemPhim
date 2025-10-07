@@ -1,0 +1,91 @@
+// types/movie.ts - Định nghĩa kiểu dữ liệu cho phim
+
+export interface Movie {
+  _id: string;
+  id?: string;
+  name: string;
+  origin_name: string;
+  poster_url: string;
+  thumb_url: string;
+  year: number;
+  time?: string;
+  episode_current?: string;
+  episode_total?: string;
+  quality?: string;
+  lang?: string;
+  content?: string;
+  category?: Category[];
+  country?: Country[];
+  type?: string;
+  status?: string;
+  trailer_url?: string;
+  chieurap?: boolean;
+  created?: {
+    time: string;
+  };
+  modified?: {
+    time: string;
+  };
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Country {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface ApiResponse {
+  status: boolean;
+  msg: string;
+  data: {
+    seoOnPage: any;
+    breadCrumb: any[];
+    titlePage: string;
+    items: Movie[];
+    params: {
+      type_slug: string;
+      filterCategory: any[];
+      filterCountry: any[];
+      filterYear: string;
+      filterType: string;
+      sortField: string;
+      sortType: string;
+      pagination: {
+        totalItems: number;
+        totalItemsPerPage: number;
+        currentPage: number;
+        totalPages: number;
+      };
+    };
+    type_list: string;
+    APP_DOMAIN_FRONTEND: string;
+    APP_DOMAIN_CDN_IMAGE: string;
+  };
+}
+
+export interface MovieDetailResponse {
+  status: boolean;
+  msg: string;
+  movie: Movie & {
+    episodes: Episode[];
+  };
+}
+
+export interface Episode {
+  server_name: string;
+  server_data: EpisodeData[];
+}
+
+export interface EpisodeData {
+  name: string;
+  slug: string;
+  filename: string;
+  link_embed: string;
+  link_m3u8: string;
+}

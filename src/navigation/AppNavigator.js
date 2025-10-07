@@ -7,9 +7,19 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import OTPScreen from '../screens/OTPScreen';
-import HomeScreen from '../screens/HomeScreen';
+import HomeScreen from '../screens/HomeScreen'; // Updated to use TypeScript version
 import MovieDetailScreen from '../screens/MovieDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+
+// Import Category Screens
+import {
+  NewMoviesScreen,
+  SingleMoviesScreen,
+  SeriesMoviesScreen,
+  AnimeScreen,
+  USUKMoviesScreen,
+  KoreanMoviesScreen,
+} from '../screens/categories';
 
 const Stack = createStackNavigator();
 
@@ -34,6 +44,14 @@ const AppNavigator = () => {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="MovieDetail" component={MovieDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        
+        {/* Category Screens */}
+        <Stack.Screen name="NewMovies" component={NewMoviesScreen} />
+        <Stack.Screen name="SingleMovies" component={SingleMoviesScreen} />
+        <Stack.Screen name="SeriesMovies" component={SeriesMoviesScreen} />
+        <Stack.Screen name="Anime" component={AnimeScreen} />
+        <Stack.Screen name="USUKMovies" component={USUKMoviesScreen} />
+        <Stack.Screen name="KoreanMovies" component={KoreanMoviesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,13 +1,40 @@
-# App Xem Phim - MovieFlix
+# 🎬 AppXemPhim - React Native Movie App
 
-Ứng dụng xem phim trên điện thoại được xây dựng với React Native, sử dụng react-native-linear-gradient cho giao diện đẹp mắt.
+Ứng dụng xem phim di động được xây dựng bằng React Native và TypeScript, tích hợp API từ phimapi.com.
 
-## Tính năng
+> 📚 **[📖 Xem tài liệu đầy đủ](.github/README.md)** | 🏗️ **[Cấu trúc dự án](.github/docs/FOLDER_STRUCTURE.md)** | ⚙️ **[Development Guidelines](.github/copilot-instructions.md)**
 
-- 🎬 Màn hình chào mừng với thiết kế gradient đẹp mắt
-- 🔐 Đăng nhập / Đăng ký tài khoản
-- 📱 Xác thực OTP
-- 🏠 Trang chủ với danh sách phim
+## 📱 Tính năng chính
+
+- ✅ **Xem danh sách phim** theo danh mục (mới nhất, phim lẻ, phim bộ, anime, US-UK, Hàn Quốc)
+- ✅ **Chi tiết phim** với thông tin đầy đủ
+- ✅ **Tìm kiếm phim** theo tên
+- ✅ **UI/UX đẹp** với gradient và animations
+- ✅ **Tối ưu hình ảnh** với WEBP conversion
+- ✅ **TypeScript** cho type safety
+
+## 🏗️ Kiến trúc dự án
+
+### 📂 Cấu trúc thư mục
+```
+src/
+├── 🎯 types/           # TypeScript type definitions
+├── 🌐 services/        # API services layer  
+├── 🔧 utils/           # Utility functions
+├── 🪝 hooks/           # Custom React Hooks
+├── 🎨 components/      # Reusable UI components
+├── � screens/         # App screens
+├── 🧭 navigation/      # Navigation setup
+├── 🎨 constants/       # App constants (colors, etc.)
+└── 📦 assets/          # Static assets
+```
+
+### 🎯 Phân tách trách nhiệm
+- **Services**: Xử lý API calls và data fetching
+- **Components**: UI components tái sử dụng
+- **Hooks**: Business logic và state management  
+- **Utils**: Helper functions cho image, data processing
+- **Types**: TypeScript interfaces và types
 - 🎥 Chi tiết phim với mô tả đầy đủ
 - 👤 Trang cá nhân người dùng
 

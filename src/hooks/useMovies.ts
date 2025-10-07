@@ -1,130 +1,280 @@
-// hooks/useMovies.ts - Custom hook để quản lý state phim
-
 import { useState, useEffect, useCallback } from 'react';
-import { Movie } from '../types/movie';
 import movieService from '../services/api/movieService';
+import { transformMovieDetailArrayToMovieArray } from '../utils/movieDataTransform';
+import { Movie } from '../types/Movie';
 
 interface UseMoviesState {
-  // Dữ liệu phim
-  newMovies: Movie[];
-  singleMovies: Movie[];
-  seriesMovies: Movie[];
-  animeMovies: Movie[];
-  usukMovies: Movie[];
-  koreanMovies: Movie[];
-  featuredMovie: Movie | null;
-  
-  // Trạng thái loading
+  movies: Movie[];
   loading: boolean;
-  refreshing: boolean;
-  
-  // Lỗi
   error: string | null;
-  
-  // Hàm actions
-  loadMoviesData: () => Promise<void>;
-  onRefresh: () => Promise<void>;
+  totalPages: number;
+  currentPage: number;
 }
 
-/**
- * Custom hook để quản lý việc load và refresh dữ liệu phim
- * @returns Object chứa state và functions
- */
-export const useMovies = (): UseMoviesState => {
-  // State cho các loại phim
-  const [newMovies, setNewMovies] = useState<Movie[]>([]);
-  const [singleMovies, setSingleMovies] = useState<Movie[]>([]);
-  const [seriesMovies, setSeriesMovies] = useState<Movie[]>([]);
-  const [animeMovies, setAnimeMovies] = useState<Movie[]>([]);
-  const [usukMovies, setUsukMovies] = useState<Movie[]>([]);
-  const [koreanMovies, setKoreanMovies] = useState<Movie[]>([]);
-  const [featuredMovie, setFeaturedMovie] = useState<Movie | null>(null);
-  
-  // State cho UI
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface UseMoviesResult extends UseMoviesState {
+  loadNewMovies: (page: number) => Promise<void>;
+  loadSeriesMovies: (page: number) => Promise<void>;
+  loadSingleMovies: (page: number) => Promise<void>;
+  loadAnimeMovies: (page: number) => Promise<void>;
+  loadKoreanMovies: (page: number) => Promise<void>;
+  loadUSUKMovies: (page: number) => Promise<void>;
+  loadMoviesByCategory: (categorySlug: string, page: number) => Promise<void>;
+  searchMovies: (keyword: string, page: number) => Promise<void>;
+  resetMovies: () => void;
+  refreshMovies: () => Promise<void>;
+}
 
-  /**
-   * Load tất cả dữ liệu phim từ API
-   */
-  const loadMoviesData = useCallback(async (): Promise<void> => {
-    try {
-      console.log('🔄 Bắt đầu load dữ liệu phim...');
-      setError(null);
-      
-      // Gọi tất cả API song song để tăng performance
-      const [
-        newMoviesData,
-        singleMoviesData, 
-        seriesMoviesData,
-        animeMoviesData,
-        usukMoviesData,
-        koreanMoviesData
-      ] = await Promise.all([
-        movieService.getNewMovies(),
-        movieService.getSingleMovies(),
-        movieService.getSeriesMovies(), 
-        movieService.getAnimeMovies(),
-        movieService.getUSUKMovies(),
-        movieService.getKoreanMovies()
-      ]);
+export const useMovies = (initialType?: string): UseMoviesResult => {
+  const [state, setState] = useState<UseMoviesState>({
+    movies: [],
+    loading: false,
+    error: null,
+    totalPages: 1,
+    currentPage: 1,
+  });
 
-      // Cập nhật state
-      setNewMovies(newMoviesData);
-      setSingleMovies(singleMoviesData);
-      setSeriesMovies(seriesMoviesData);
-      setAnimeMovies(animeMoviesData);
-      setUsukMovies(usukMoviesData);
-      setKoreanMovies(koreanMoviesData);
-      
-      // Set featured movie từ phim mới nhất
-      if (newMoviesData.length > 0) {
-        setFeaturedMovie(newMoviesData[0]);
-      }
-      
-      console.log('✅ Load dữ liệu phim thành công');
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định';
-      console.error('❌ Lỗi khi load dữ liệu phim:', errorMessage);
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+  const updateState = useCallback((updates: Partial<UseMoviesState>) => {
+    setState(prev => ({ ...prev, ...updates }));
   }, []);
 
-  /**
-   * Refresh dữ liệu phim
-   */
-  const onRefresh = useCallback(async (): Promise<void> => {
-    setRefreshing(true);
-    await loadMoviesData();
-    setRefreshing(false);
-  }, [loadMoviesData]);
+  const loadNewMovies = useCallback(async (page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getNewMovies(page);
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error('Không thể tải danh sách phim mới');
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
 
-  // Load dữ liệu khi component mount
+  const loadSeriesMovies = useCallback(async (page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getSeriesMovies({ page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error('Không thể tải danh sách phim bộ');
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const loadSingleMovies = useCallback(async (page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getSingleMovies({ page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error('Không thể tải danh sách phim lẻ');
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const loadAnimeMovies = useCallback(async (page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getAnimeMovies({ page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error('Không thể tải danh sách phim anime');
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const loadKoreanMovies = useCallback(async (page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getKoreanMovies({ page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error('Không thể tải danh sách phim Hàn Quốc');
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const loadUSUKMovies = useCallback(async (page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getUSUKMovies({ page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error('Không thể tải danh sách phim Âu Mỹ');
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const loadMoviesByCategory = useCallback(async (categorySlug: string, page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.getMoviesByCategory(categorySlug, { page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error(`Không thể tải phim theo thể loại: ${categorySlug}`);
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const searchMovies = useCallback(async (keyword: string, page: number = 1) => {
+    updateState({ loading: true, error: null, currentPage: page });
+    
+    try {
+      const response = await movieService.searchMovies(keyword, { page });
+      if (response?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(response.data.items);
+        updateState({
+          movies: page === 1 ? transformedMovies : [...state.movies, ...transformedMovies],
+          loading: false,
+          totalPages: response.data.params?.pagination?.totalPages || 1,
+        });
+      } else {
+        throw new Error(`Không tìm thấy kết quả cho: ${keyword}`);
+      }
+    } catch (error) {
+      updateState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Lỗi không xác định'
+      });
+    }
+  }, [state.movies, updateState]);
+
+  const resetMovies = useCallback(() => {
+    setState({
+      movies: [],
+      loading: false,
+      error: null,
+      totalPages: 1,
+      currentPage: 1,
+    });
+  }, []);
+
+  const refreshMovies = useCallback(async () => {
+    if (initialType) {
+      switch (initialType) {
+        case 'new':
+          await loadNewMovies(1);
+          break;
+        case 'series':
+          await loadSeriesMovies(1);
+          break;
+        case 'single':
+          await loadSingleMovies(1);
+          break;
+        case 'anime':
+          await loadAnimeMovies(1);
+          break;
+        case 'korean':
+          await loadKoreanMovies(1);
+          break;
+        case 'usuk':
+          await loadUSUKMovies(1);
+          break;
+        default:
+          await loadNewMovies(1);
+      }
+    } else {
+      await loadNewMovies(1);
+    }
+  }, [initialType, loadNewMovies, loadSeriesMovies, loadSingleMovies, loadAnimeMovies, loadKoreanMovies, loadUSUKMovies]);
+
   useEffect(() => {
-    loadMoviesData();
-  }, [loadMoviesData]);
+    refreshMovies();
+  }, [refreshMovies]);
 
   return {
-    // Data
-    newMovies,
-    singleMovies,
-    seriesMovies,
-    animeMovies,
-    usukMovies,
-    koreanMovies,
-    featuredMovie,
-    
-    // UI State
-    loading,
-    refreshing,
-    error,
-    
-    // Actions
-    loadMoviesData,
-    onRefresh,
+    ...state,
+    loadNewMovies,
+    loadSeriesMovies,
+    loadSingleMovies,
+    loadAnimeMovies,
+    loadKoreanMovies,
+    loadUSUKMovies,
+    loadMoviesByCategory,
+    searchMovies,
+    resetMovies,
+    refreshMovies,
   };
 };

@@ -15,7 +15,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import { NavigationProp, RouteProp } from '@react-navigation/native';
 
 import { MovieCard } from '../../../components';
-import { movieService } from '../../../services/api';
+import movieService from '../../../services/api/movieService';
+import { transformMovieDetailArrayToMovieArray } from '../../../utils/movieDataTransform';
 import { colors } from '../../../constants/colors';
 import { Movie } from '../../../types/movie';
 
@@ -49,7 +50,9 @@ const NewMoviesScreen: React.FC<NewMoviesScreenProps> = ({ navigation }) => {
         setLoadingMore(true);
       }
 
-      const newMovies = await movieService.getNewMovies(pageNum);
+      const result = await movieService.getNewMovies(pageNum);
+      const movieDetails = result?.data?.items || [];
+      const newMovies = transformMovieDetailArrayToMovieArray(movieDetails);
       
       if (newMovies && newMovies.length > 0) {
         if (pageNum === 1) {

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { colors } from '../../constants/colors';
-import { movieDetailService } from '../../api/endpoints/movieDetail';
+import { movieDetailService } from '../../services/api/movieDetailService';
 
 const EpisodeSelector = ({ 
   movie, 

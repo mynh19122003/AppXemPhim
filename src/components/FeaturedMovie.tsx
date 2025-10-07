@@ -10,9 +10,24 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Movie } from '../types/movie';
-import { getMovieImageUrl } from '../utils/imageHelper';
 import { getMovieTitle, getMovieDescription, getMovieGenres } from '../utils/movieHelper';
 import { colors } from '../constants/colors';
+
+// Helper function để lấy URL hình ảnh gốc từ API
+const getOriginalImageUrl = (movie: Movie) => {
+  if (!movie) return null;
+  
+  // Sử dụng poster_url hoặc thumb_url trực tiếp từ API
+  const imageUrl = movie.poster_url || movie.thumb_url;
+  if (!imageUrl) return null;
+  
+  // Nếu URL đã có domain thì dùng luôn, không thì thêm domain phimimg.com
+  if (imageUrl.startsWith('http')) {
+    return imageUrl;
+  }
+  
+  return `https://phimimg.com/${imageUrl}`;
+};
 
 interface FeaturedMovieProps {
   movie: Movie;
@@ -26,7 +41,7 @@ export const FeaturedMovie: React.FC<FeaturedMovieProps> = ({ movie, onPress }) 
   return (
     <View style={styles.featuredContainer}>
       <Image
-        source={{ uri: getMovieImageUrl(movie, false) || undefined }}
+        source={{ uri: getOriginalImageUrl(movie) || undefined }}
         style={styles.featuredImage}
         resizeMode="cover"
       />
@@ -39,12 +54,12 @@ export const FeaturedMovie: React.FC<FeaturedMovieProps> = ({ movie, onPress }) 
           </Text>
           <View style={styles.featuredGenres}>
             {getMovieGenres(movie, 3).map((genre, index) => (
-              <Text key={index} style={styles.genreTag}>
-                {genre}
+              <Text key={`featured-genre-${index}`} style={styles.genreTag}>
+                {typeof genre === 'object' && genre !== null ? ((genre as any).name || (genre as any).title || String(genre)) : String(genre || '')}
               </Text>
             ))}
-            <Text style={styles.genreTag}>{movie.year}</Text>
-            {movie.lang && <Text style={styles.genreTag}>{movie.lang}</Text>}
+            <Text style={styles.genreTag}>{String(movie.year || '')}</Text>
+            {movie.lang && <Text style={styles.genreTag}>{String(movie.lang)}</Text>}
           </View>
           <Text style={styles.featuredDescription} numberOfLines={3}>
             {getMovieDescription(movie)}

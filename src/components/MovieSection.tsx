@@ -30,7 +30,8 @@ export const MovieSection: React.FC<MovieSectionProps> = ({
   onMoviePress,
   onSeeAllPress,
 }) => {
-  if (movies.length === 0) {
+  // Kiểm tra movies có hợp lệ không
+  if (!movies || !Array.isArray(movies) || movies.length === 0) {
     return null;
   }
 
@@ -53,14 +54,16 @@ export const MovieSection: React.FC<MovieSectionProps> = ({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.movieRow}>
-        {movies.map((movie, index) => (
+        {(movies && Array.isArray(movies)) ? movies.map((movie, index) => (
           <MovieCard
             key={movie._id || movie.id || index}
             movie={movie}
             showDuration={showDuration}
             onPress={onMoviePress}
           />
-        ))}
+        )) : (
+          <Text style={{ color: 'white', padding: 20 }}>Không có phim nào</Text>
+        )}
       </ScrollView>
     </View>
   );

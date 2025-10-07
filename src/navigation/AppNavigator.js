@@ -7,11 +7,10 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import OTPScreen from '../screens/OTPScreen';
-import HomeScreen from '../screens/HomeScreen'; // Updated to use TypeScript version
+import HomeScreen from '../screens/HomeScreen.tsx'; // Explicitly import TypeScript version
 import MovieDetailScreen from '../screens/MovieDetailScreen';
 import WatchMovieScreen from '../screens/WatchMovieScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import VideoTestScreen from '../screens/VideoTestScreen';
 
 // Import Category Screens
 import {
@@ -46,7 +45,6 @@ const AppNavigator = () => {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="MovieDetail" component={MovieDetailScreen} />
         <Stack.Screen name="WatchMovie" component={WatchMovieScreen} />
-        <Stack.Screen name="VideoTest" component={VideoTestScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         
         {/* Category Screens */}

@@ -13,76 +13,108 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { colors } from '../constants/colors';
-import { movieDetailService } from '../api/endpoints/movieDetail';
-import VideoPlayer from '../components/VideoPlayer';
-import { getImageSource } from '../utils/imageUtils';
+import { movieDetailService } from '../services/api/movieDetailService';
+import VideoPlayer from '../components/VideoPlayer/VideoPlayer';
+
+// Helper function để lấy URL hình ảnh gốc từ API
+const getOriginalImageUrl = (movie) => {
+  if (!movie) return null;
+  
+  // Ưu tiên field mới từ movieService, fallback sang field cũ
+  const imageUrl = movie.poster || movie.thumbnail || movie.poster_url || movie.thumb_url;
+  if (!imageUrl) return null;
+  
+  // Nếu URL đã có domain thì dùng luôn, không thì thêm domain phimimg.com
+  if (imageUrl.startsWith('http')) {
+    return imageUrl;
+  }
+  
+  return `https://phimimg.com/${imageUrl}`;
+};
 
 const WatchMovieScreen = ({ navigation, route }) => {
   const { movie, episodeSlug = null } = route.params;
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
-  const [streamUrl, setStreamUrl] = useState(null);
-  const [videoLoading, setVideoLoading] = useState(false);
+  const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [movieDetail, setMovieDetail] = useState(null);
+  const [flatEpisodes, setFlatEpisodes] = useState([]); // Flat list cho VideoPlayer
 
   useEffect(() => {
     loadMovieData();
   }, []);
-
-  useEffect(() => {
-    if (episodeSlug && episodes.length > 0) {
-      // Tự động phát episode được chỉ định
-      const episode = findEpisodeBySlug(episodeSlug);
-      if (episode) {
-        playEpisode(episode);
-      }
-    }
-  }, [episodes, episodeSlug]);
 
   const loadMovieData = async () => {
     try {
       setLoading(true);
       console.log(`🎬 Loading movie data for: ${movie.slug}`);
       
-      // Lấy chi tiết phim và episodes
+      // Lấy chi tiết phim và episodes từ movieDetailService
       const result = await movieDetailService.getMovieDetail(movie.slug);
       if (result && result.movie) {
         setMovieDetail(result.movie);
         console.log(`✅ Movie loaded: ${result.movie.name}`);
-      }
-      
-      const episodesList = await movieDetailService.getEpisodes(movie.slug);
-      setEpisodes(episodesList);
-      console.log(`📺 Episodes loaded: ${episodesList.length} servers`);
-      
-      // Log episodes structure để debug
-      episodesList.forEach((group, index) => {
-        console.log(`Server ${index + 1}: ${group.server_name} - ${group.server_data?.length || 0} episodes`);
-      });
-      
-      // Nếu chỉ có 1 server và 1 episode (phim lẻ), tự động phát
-      if (episodesList.length === 1 && episodesList[0].server_data?.length === 1) {
-        const episode = episodesList[0].server_data[0];
-        console.log(`🎥 Auto-playing single episode: ${episode.name}`);
-        await playEpisode(episode);
-      }
-      // Nếu có episodeSlug được chỉ định, tự động phát episode đó
-      else if (episodeSlug) {
-        console.log(`🎯 Looking for specified episode: ${episodeSlug}`);
-        const episode = findEpisodeBySlug(episodeSlug);
-        if (episode) {
-          await playEpisode(episode);
+        
+        // Set episodes từ movie detail
+        if (result.episodes && result.episodes.length > 0) {
+          setEpisodes(result.episodes);
+          console.log(`📺 Episodes loaded: ${result.episodes.length} servers`);
+          
+          // Tạo flat episodes list cho VideoPlayer
+          const allEpisodes = [];
+          result.episodes.forEach((serverGroup) => {
+            if (serverGroup.server_data && serverGroup.server_data.length > 0) {
+              serverGroup.server_data.forEach((ep) => {
+                allEpisodes.push({
+                  id: ep.slug,
+                  title: ep.name,
+                  videoUrl: ep.link_m3u8 || ep.link_embed,
+                  serverName: serverGroup.server_name,
+                });
+              });
+            }
+          });
+          setFlatEpisodes(allEpisodes);
+          console.log(`📋 Flat episodes created: ${allEpisodes.length} total episodes`);
+          
+          // Log episodes structure để debug
+          result.episodes.forEach((group, index) => {
+            console.log(`Server ${index + 1}: ${group.server_name} - ${group.server_data?.length || 0} episodes`);
+          });
+          
+          // Nếu có episodes, tự động chọn episode đầu tiên
+          if (allEpisodes.length > 0) {
+            const firstEpisode = allEpisodes[0];
+            setSelectedEpisode(firstEpisode);
+            setCurrentEpisodeIndex(0);
+            console.log(`🎥 Auto-selected first episode: ${firstEpisode.title}`);
+          }
+          
+          // Nếu có episodeSlug được chỉ định, tìm và chọn episode đó
+          if (episodeSlug) {
+            console.log(`🎯 Looking for specified episode: ${episodeSlug}`);
+            const episodeIndex = allEpisodes.findIndex(ep => ep.id === episodeSlug);
+            if (episodeIndex !== -1) {
+              setSelectedEpisode(allEpisodes[episodeIndex]);
+              setCurrentEpisodeIndex(episodeIndex);
+              console.log(`✅ Found and selected episode: ${allEpisodes[episodeIndex].title}`);
+            } else {
+              console.warn(`⚠️ Episode ${episodeSlug} not found, using first episode`);
+            }
+          }
         } else {
-          console.warn(`⚠️ Episode ${episodeSlug} not found, user can select manually`);
+          console.log('⚠️ No episodes found in movie detail');
         }
+      } else {
+        console.warn('⚠️ No movie detail found');
       }
     } catch (error) {
       console.error('❌ Load movie data error:', error);
       Alert.alert(
         'Lỗi tải phim',
-        `Không thể tải thông tin phim "${movie.name}". Vui lòng thử lại.`,
+        `Không thể tải thông tin phim "${movie.title || movie.name}". Vui lòng thử lại.`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } finally {
@@ -90,103 +122,65 @@ const WatchMovieScreen = ({ navigation, route }) => {
     }
   };
 
-  const findEpisodeBySlug = (slug) => {
-    for (const episodeGroup of episodes) {
-      const found = episodeGroup.server_data?.find(ep => ep.slug === slug);
-      if (found) return found;
-    }
-    return null;
+  // Handle episode change từ VideoPlayer
+  const handleEpisodeChange = (episode, index) => {
+    setSelectedEpisode(episode);
+    setCurrentEpisodeIndex(index);
+    console.log(`🔄 Changed to episode: ${episode.title} (Index: ${index})`);
   };
 
-  const playEpisode = async (episode) => {
-    try {
-      setVideoLoading(true);
-      setSelectedEpisode(episode);
-      console.log(`🎬 Playing episode: ${episode.name}`);
-      
-      const streamData = await movieDetailService.getEpisodeStreamUrl(movie.slug, episode.slug);
-      
-      console.log(`🎥 Stream data received:`, {
-        hasM3u8: !!streamData.m3u8Url,
-        hasEmbed: !!streamData.embedUrl,
-        serverName: streamData.serverName
-      });
-      
-      // Ưu tiên M3U8, fallback sang embed
-      const videoUrl = streamData.streamUrl;
-      
-      if (!videoUrl) {
-        throw new Error('Không có link video khả dụng');
-      }
-      
-      console.log(`▶️ Setting video URL: ${videoUrl.substring(0, 50)}...`);
-      setStreamUrl(videoUrl);
-      
-    } catch (error) {
-      console.error('❌ Play episode error:', error);
-      Alert.alert(
-        'Lỗi phát video',
-        `Không thể phát episode "${episode.name}". ${error.message}`,
-        [
-          { text: 'Thử episode khác', style: 'default' },
-          { text: 'OK', style: 'cancel' }
-        ]
-      );
-    } finally {
-      setVideoLoading(false);
-    }
-  };
-
-  const closeVideo = () => {
-    setStreamUrl(null);
-    setSelectedEpisode(null);
-    setIsFullscreen(false);
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+  // Handle fullscreen toggle
+  const handleFullscreenToggle = (isFullscreen) => {
+    setIsFullscreen(isFullscreen);
   };
 
   const renderEpisodeItem = ({ item: episodeGroup, index: groupIndex }) => {
-    if (!episodeGroup.server_data || episodeGroup.server_data.length === 0) {
+    if (!episodeGroup.episodes || episodeGroup.episodes.length === 0) {
       return null;
     }
 
     return (
       <View style={styles.episodeGroup}>
         <Text style={styles.serverName}>
-          {episodeGroup.server_name || `Server ${groupIndex + 1}`}
-          <Text style={styles.episodeCount}> ({episodeGroup.server_data.length} tập)</Text>
+          {episodeGroup.serverName || `Server ${groupIndex + 1}`}
+          <Text style={styles.episodeCount}> ({episodeGroup.episodes.length} tập)</Text>
         </Text>
         
         <View style={styles.episodesGrid}>
-          {episodeGroup.server_data.map((episode, episodeIndex) => (
-            <TouchableOpacity
-              key={episodeIndex}
-              style={[
-                styles.episodeCard,
-                selectedEpisode?.slug === episode.slug && styles.selectedEpisodeCard
-              ]}
-              onPress={() => playEpisode(episode)}
-              disabled={videoLoading}
-            >
-              <Text style={[
-                styles.episodeText,
-                selectedEpisode?.slug === episode.slug && styles.selectedEpisodeText
-              ]}>
-                {episode.name}
-              </Text>
-              {/* Hiển thị indicator cho video quality */}
-              <View style={styles.qualityIndicators}>
-                {episode.link_m3u8 && (
-                  <Text style={styles.qualityBadge}>M3U8</Text>
-                )}
-                {episode.link_embed && (
-                  <Text style={styles.qualityBadge}>HD</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
+          {episodeGroup.episodes.map((episode, episodeIndex) => {
+            // Tìm index trong flatEpisodes
+            const flatIndex = flatEpisodes.findIndex(ep => ep.id === episode.id);
+            const isSelected = selectedEpisode?.id === episode.id;
+            
+            return (
+              <TouchableOpacity
+                key={episodeIndex}
+                style={[
+                  styles.episodeCard,
+                  isSelected && styles.selectedEpisodeCard
+                ]}
+                onPress={() => {
+                  const episodeToPlay = flatEpisodes[flatIndex];
+                  if (episodeToPlay) {
+                    handleEpisodeChange(episodeToPlay, flatIndex);
+                  }
+                }}
+              >
+                <Text style={[
+                  styles.episodeText,
+                  isSelected && styles.selectedEpisodeText
+                ]}>
+                  {episode.title}
+                </Text>
+                {/* Hiển thị indicator cho video quality */}
+                <View style={styles.qualityIndicators}>
+                  {episode.videoUrl && (
+                    <Text style={styles.qualityBadge}>HD</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     );
@@ -209,13 +203,16 @@ const WatchMovieScreen = ({ navigation, route }) => {
       <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
       
       {/* Video Player */}
-      {streamUrl && (
+      {selectedEpisode && selectedEpisode.videoUrl && (
         <VideoPlayer
-          source={streamUrl}
-          onClose={closeVideo}
-          title={`${movie.name} - ${selectedEpisode?.name || ''}`}
+          videoUrl={selectedEpisode.videoUrl}
+          title={`${movie.title || movie.name} - ${selectedEpisode.title}`}
+          episodes={flatEpisodes}
+          currentEpisodeIndex={currentEpisodeIndex}
+          onEpisodeChange={handleEpisodeChange}
+          onGoBack={() => navigation.goBack()}
           isFullscreen={isFullscreen}
-          onFullscreenToggle={toggleFullscreen}
+          onFullscreenToggle={handleFullscreenToggle}
         />
       )}
 
@@ -231,19 +228,19 @@ const WatchMovieScreen = ({ navigation, route }) => {
               <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle} numberOfLines={1}>
-              {movie.name}
+              {movie.title || movie.name}
             </Text>
           </View>
 
           {/* Movie Info */}
           <View style={styles.movieInfo}>
             <Image 
-              source={getImageSource(movie.poster_url || movie.thumb_url, true)} 
+              source={{uri: getOriginalImageUrl(movie) || undefined}} 
               style={styles.poster} 
             />
             
             <View style={styles.movieDetails}>
-              <Text style={styles.movieTitle}>{movie.name}</Text>
+              <Text style={styles.movieTitle}>{movie.title || movie.name}</Text>
               <Text style={styles.movieOriginName}>{movie.origin_name}</Text>
               
               <View style={styles.movieMeta}>
@@ -254,9 +251,9 @@ const WatchMovieScreen = ({ navigation, route }) => {
 
               <View style={styles.genresContainer}>
                 {(movieDetail?.category || movie.category || []).slice(0, 3).map((item, index) => (
-                  <View key={index} style={styles.genreChip}>
+                  <View key={`genre-${index}`} style={styles.genreChip}>
                     <Text style={styles.genreText}>
-                      {typeof item === 'object' ? item.name : item}
+                      {typeof item === 'object' && item !== null ? (item.name || item.title || String(item)) : String(item || '')}
                     </Text>
                   </View>
                 ))}
@@ -264,26 +261,15 @@ const WatchMovieScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Loading Video */}
-          {videoLoading && (
-            <View style={styles.videoLoadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.videoLoadingText}>Đang tải video...</Text>
-              <Text style={styles.videoLoadingSubtext}>
-                {selectedEpisode ? `Tập: ${selectedEpisode.name}` : 'Đang xử lý link stream...'}
-              </Text>
-            </View>
-          )}
-
           {/* Video Player Info */}
-          {streamUrl && !isFullscreen && (
+          {selectedEpisode && selectedEpisode.videoUrl && !isFullscreen && (
             <View style={styles.videoInfoContainer}>
               <Text style={styles.videoInfoTitle}>Đang phát</Text>
               <Text style={styles.videoInfoEpisode}>
-                {selectedEpisode?.name || 'Video'} - {movie.name}
+                {selectedEpisode.title || 'Video'} - {movie.title || movie.name}
               </Text>
               <Text style={styles.videoInfoUrl}>
-                Stream: {streamUrl.includes('m3u8') ? 'M3U8 Stream' : 'Video Player'}
+                Stream: {selectedEpisode.videoUrl.includes('m3u8') ? 'M3U8 Stream' : 'Video Player'}
               </Text>
             </View>
           )}
@@ -304,11 +290,11 @@ const WatchMovieScreen = ({ navigation, route }) => {
           </View>
 
           {/* Description */}
-          {movieDetail?.content && (
+          {(movieDetail?.description || movieDetail?.content) && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Nội dung phim</Text>
               <Text style={styles.description}>
-                {movieDetail.content.replace(/<[^>]*>/g, '')}
+                {(movieDetail?.description || movieDetail?.content)?.replace(/<[^>]*>/g, '') || ''}
               </Text>
             </View>
           )}
@@ -317,12 +303,24 @@ const WatchMovieScreen = ({ navigation, route }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin chi tiết</Text>
             <View style={styles.detailsList}>
-              <DetailRow label="Đạo diễn" value={movieDetail?.director?.join(', ') || 'N/A'} />
-              <DetailRow label="Diễn viên" value={movieDetail?.actor?.join(', ') || 'N/A'} />
-              <DetailRow label="Thể loại" value={movieDetail?.category?.map(c => c.name).join(', ') || 'N/A'} />
-              <DetailRow label="Quốc gia" value={movieDetail?.country?.map(c => c.name).join(', ') || 'N/A'} />
+              <DetailRow label="Đạo diễn" value={movieDetail?.director || 'N/A'} />
+              <DetailRow label="Diễn viên" value={Array.isArray(movieDetail?.cast) ? movieDetail.cast.join(', ') : (movieDetail?.cast || 'N/A')} />
+              <DetailRow label="Thể loại" value={
+                Array.isArray(movieDetail?.genres) 
+                  ? movieDetail.genres.join(', ') 
+                  : (Array.isArray(movieDetail?.categories) 
+                      ? movieDetail.categories.map(c => typeof c === 'object' ? (c.name || c.title || String(c)) : String(c)).join(', ') 
+                      : 'N/A')
+              } />
+              <DetailRow label="Quốc gia" value={
+                typeof movieDetail?.country === 'string' 
+                  ? movieDetail.country
+                  : (Array.isArray(movieDetail?.countryData) 
+                      ? movieDetail.countryData.map(c => typeof c === 'object' ? (c.name || c.title || String(c)) : String(c)).join(', ') 
+                      : 'N/A')
+              } />
               <DetailRow label="Năm sản xuất" value={movieDetail?.year || 'N/A'} />
-              <DetailRow label="Thời lượng" value={movieDetail?.time || 'N/A'} />
+              <DetailRow label="Thời lượng" value={movieDetail?.duration ? `${movieDetail.duration} phút` : (movieDetail?.time || 'N/A')} />
               <DetailRow label="Chất lượng" value={movieDetail?.quality || 'N/A'} />
             </View>
           </View>
@@ -431,23 +429,6 @@ const styles = StyleSheet.create({
   genreText: {
     color: colors.text,
     fontSize: 11,
-  },
-  videoLoadingContainer: {
-    backgroundColor: colors.cardBackground,
-    margin: 15,
-    padding: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  videoLoadingText: {
-    color: colors.text,
-    marginTop: 10,
-    fontSize: 16,
-  },
-  videoLoadingSubtext: {
-    color: colors.textSecondary,
-    marginTop: 5,
-    fontSize: 12,
   },
   videoInfoContainer: {
     backgroundColor: colors.cardBackground,

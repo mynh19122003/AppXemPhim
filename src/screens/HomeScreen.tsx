@@ -1,6 +1,6 @@
 // screens/HomeScreen.new.tsx - Màn hình chính với cấu trúc mới
 
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,9 @@ import { NavigationProp } from '@react-navigation/native';
 import { useMovies } from '../hooks/useMovies';
 import { FeaturedMovie, MovieSection } from '../components';
 import { colors } from '../constants/colors';
+import movieService from '../services/api/movieService';
+import { transformMovieDetailArrayToMovieArray } from '../utils/movieDataTransform';
+import { Movie } from '../types/Movie';
 
 interface HomeScreenProps {
   navigation: NavigationProp<any>;
@@ -27,20 +30,101 @@ interface HomeScreenProps {
  * Màn hình chính hiển thị danh sách phim theo các danh mục
  */
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  // Sử dụng custom hook để quản lý state
-  const {
-    newMovies,
-    singleMovies,
-    seriesMovies,
-    animeMovies,
-    usukMovies,
-    koreanMovies,
-    featuredMovie,
-    loading,
-    refreshing,
-    error,
-    onRefresh,
-  } = useMovies();
+  // State riêng cho từng loại phim
+  const [newMovies, setNewMovies] = useState<Movie[]>([]);
+  const [singleMovies, setSingleMovies] = useState<Movie[]>([]);
+  const [seriesMovies, setSeriesMovies] = useState<Movie[]>([]);
+  const [animeMovies, setAnimeMovies] = useState<Movie[]>([]);
+  const [usukMovies, setUsukMovies] = useState<Movie[]>([]);
+  const [koreanMovies, setKoreanMovies] = useState<Movie[]>([]);
+  const [featuredMovie, setFeaturedMovie] = useState<Movie | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load dữ liệu cho tất cả các loại phim
+  const loadAllMoviesData = useCallback(async () => {
+    setRefreshing(true);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('🔄 Loading all movies data...');
+      
+      const [
+        newMoviesResult,
+        singleMoviesResult,
+        seriesMoviesResult,
+        animeMoviesResult,
+        usukMoviesResult,
+        koreanMoviesResult,
+      ] = await Promise.all([
+        movieService.getNewMovies(),
+        movieService.getSingleMovies({ page: 1 }),
+        movieService.getSeriesMovies({ page: 1 }),
+        movieService.getAnimeMovies({ page: 1 }),
+        movieService.getUSUKMovies({ page: 1 }),
+        movieService.getKoreanMovies({ page: 1 }),
+      ]);
+
+      console.log('📊 API Results:', {
+        newMovies: newMoviesResult?.data?.items?.length || 0,
+        singleMovies: singleMoviesResult?.data?.items?.length || 0,
+        seriesMovies: seriesMoviesResult?.data?.items?.length || 0,
+        animeMovies: animeMoviesResult?.data?.items?.length || 0,
+        usukMovies: usukMoviesResult?.data?.items?.length || 0,
+        koreanMovies: koreanMoviesResult?.data?.items?.length || 0,
+      });
+
+      // Transform và set data cho từng loại phim
+      if (newMoviesResult?.data?.items) {
+        const transformedMovies = transformMovieDetailArrayToMovieArray(newMoviesResult.data.items);
+        setNewMovies(transformedMovies);
+        if (transformedMovies.length > 0) {
+          setFeaturedMovie(transformedMovies[0]); // Phim đầu tiên làm featured
+        }
+        console.log('✅ New movies set:', transformedMovies.length);
+      }
+
+      if (singleMoviesResult?.data?.items) {
+        setSingleMovies(transformMovieDetailArrayToMovieArray(singleMoviesResult.data.items));
+      }
+
+      if (seriesMoviesResult?.data?.items) {
+        setSeriesMovies(transformMovieDetailArrayToMovieArray(seriesMoviesResult.data.items));
+      }
+
+      if (animeMoviesResult?.data?.items) {
+        setAnimeMovies(transformMovieDetailArrayToMovieArray(animeMoviesResult.data.items));
+      }
+
+      if (usukMoviesResult?.data?.items) {
+        setUsukMovies(transformMovieDetailArrayToMovieArray(usukMoviesResult.data.items));
+      }
+
+      if (koreanMoviesResult?.data?.items) {
+        setKoreanMovies(transformMovieDetailArrayToMovieArray(koreanMoviesResult.data.items));
+      }
+
+    } catch (error) {
+      console.error('❌ Lỗi khi tải dữ liệu phim:', error);
+      setError('Không thể tải dữ liệu phim. Vui lòng thử lại.');
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+      console.log('✅ Loading completed');
+    }
+  }, []);
+
+  // Load dữ liệu khi component mount
+  useEffect(() => {
+    loadAllMoviesData();
+  }, [loadAllMoviesData]);
+
+  // Hàm onRefresh cho pull-to-refresh
+  const onRefresh = useCallback(() => {
+    loadAllMoviesData();
+  }, [loadAllMoviesData]);
 
   /**
    * Xử lý khi nhấn vào phim

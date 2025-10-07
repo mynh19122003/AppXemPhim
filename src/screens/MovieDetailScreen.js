@@ -11,26 +11,72 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {colors} from '../constants/colors';
-import {getImageSource} from '../utils/imageUtils';
+import {getMovieGenres, getMovieDescription} from '../utils/movieHelper';
+import EpisodeSelector from '../components/ui/EpisodeSelector';
 
 const {width} = Dimensions.get('window');
 
+// Helper function để lấy URL hình ảnh gốc từ API
+const getOriginalImageUrl = (movie) => {
+  if (!movie) return null;
+  
+  // Ưu tiên field mới từ movieService, fallback sang field cũ
+  const imageUrl = movie.poster || movie.thumbnail || movie.poster_url || movie.thumb_url;
+  if (!imageUrl) return null;
+  
+  // Nếu URL đã có domain thì dùng luôn, không thì thêm domain phimimg.com
+  if (imageUrl.startsWith('http')) {
+    return imageUrl;
+  }
+  
+  return `https://phimimg.com/${imageUrl}`;
+};
+
 const MovieDetailScreen = ({navigation, route}) => {
-  const {movie} = route.params;
+  // Debug: Kiểm tra params
+  console.log('🎬 MovieDetailScreen route.params:', route.params);
+  
+  const {movie} = route.params || {};
+  
+  // Kiểm tra movie object
+  if (!movie) {
+    console.error('❌ MovieDetailScreen: No movie data provided');
+    return (
+      <LinearGradient colors={colors.gradientStart} style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Không tìm thấy thông tin phim</Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>← Quay lại</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    );
+  }
+  
   const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
 
   const handlePlayMovie = () => {
     console.log(`🎬 Playing movie: ${movie.name} (${movie.slug})`);
     
-    // Luôn chuyển tới WatchMovieScreen để xem video và episodes
-    navigation.navigate('WatchMovie', { movie });
+    try {
+      // Luôn chuyển tới WatchMovieScreen để xem video và episodes
+      navigation.navigate('WatchMovie', { movie });
+    } catch (error) {
+      console.error('❌ Navigation error to WatchMovie:', error);
+    }
   };
 
   const handleEpisodeSelect = (episode) => {
-    navigation.navigate('WatchMovie', { 
-      movie, 
-      episodeSlug: episode.slug 
-    });
+    try {
+      navigation.navigate('WatchMovie', { 
+        movie, 
+        episodeSlug: episode.slug 
+      });
+    } catch (error) {
+      console.error('❌ Navigation error to WatchMovie with episode:', error);
+    }
   };
 
   return (
@@ -40,7 +86,7 @@ const MovieDetailScreen = ({navigation, route}) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Banner */}
         <View style={styles.bannerContainer}>
-          <Image source={{uri: getMovieImageUrl(movie, false) || undefined}} style={styles.bannerImage} />
+          <Image source={{uri: getOriginalImageUrl(movie) || undefined}} style={styles.bannerImage} />
           <LinearGradient
             colors={colors.gradientOverlay}
             style={styles.bannerOverlay}
@@ -295,6 +341,18 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: colors.textSecondary,
     fontSize: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: colors.text,
+    fontSize: 18,
+    marginBottom: 20,
+    textAlign: 'center',
   },
 });
 

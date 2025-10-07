@@ -1,8 +1,0 @@
-// services/api/index.js
-// Export tất cả API services
-
-// Export main movie service
-export { default as movieService } from './movieService';
-
-// Export config
-export * from './config';

@@ -8,11 +8,31 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Movie } from '../types/movie';
-import { getMovieImageUrl } from '../utils/imageHelper';
 import { getMovieDisplayInfo, getMovieTitle } from '../utils/movieHelper';
 import { colors } from '../constants/colors';
 
 const PLACEHOLDER_IMAGE = { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==' };
+
+// Helper function để lấy URL hình ảnh gốc từ API
+const getOriginalImageUrl = (movie: Movie) => {
+  if (!movie) return null;
+  
+  // Thử các trường hình ảnh khác nhau từ API (ưu tiên field mới)
+  let imageUrl = movie.poster || movie.thumbnail || movie.poster_url || movie.thumb_url || movie.image;
+  
+  if (!imageUrl) {
+    console.log('⚠️ No image URL found for movie:', movie.title || movie.name);
+    return null;
+  }
+  
+  // Nếu URL đã có domain thì dùng luôn
+  if (imageUrl.startsWith('http')) {
+    return imageUrl;
+  }
+  
+  // Thêm domain phimimg.com cho relative URLs
+  return `https://phimimg.com/${imageUrl}`;
+};
 
 interface MovieCardProps {
   movie: Movie;
@@ -26,15 +46,18 @@ export const MovieCard: React.FC<MovieCardProps> = ({
   onPress,
 }) => {
   const [imageError, setImageError] = React.useState(false);
-  const imageUrl = getMovieImageUrl(movie, false); // Luôn sử dụng ảnh gốc, không optimization
+  const imageUrl = getOriginalImageUrl(movie); // Sử dụng hình ảnh gốc từ API
   
   // Debug log để kiểm tra URL
   React.useEffect(() => {
-    if (imageUrl) {
-      console.log('🎬 MovieCard URL:', movie.name);
-      console.log('📷 Direct Image URL:', imageUrl);
-    }
-  }, [imageUrl, movie.name]);
+    console.log('🎬 MovieCard Debug:', {
+      movieName: movie.name,
+      posterUrl: movie.poster_url,
+      thumbUrl: movie.thumb_url,
+      finalUrl: imageUrl,
+      hasImageUrl: !!imageUrl
+    });
+  }, [imageUrl, movie.title || movie.name]);
 
   return (
     <TouchableOpacity
@@ -53,11 +76,11 @@ export const MovieCard: React.FC<MovieCardProps> = ({
         style={styles.movieImage}
         resizeMode="cover"
         onError={(error) => {
-          console.log('❌ Image error for:', movie.name, error.nativeEvent?.error);
+          console.log('❌ Image error for:', movie.title || movie.name, error.nativeEvent?.error);
           setImageError(true);
         }}
         onLoad={() => {
-          console.log('✅ Image loaded for:', movie.name);
+          console.log('✅ Image loaded for:', movie.title || movie.name);
         }}
       />
       <LinearGradient

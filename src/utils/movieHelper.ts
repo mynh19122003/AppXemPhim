@@ -9,22 +9,30 @@ import { Movie } from '../types/movie';
  * @returns Chuỗi thông tin hiển thị
  */
 export const getMovieDisplayInfo = (movie: Movie, showDuration: boolean = false): string => {
-  // Hiển thị thời lượng cho phim lẻ
-  if (showDuration && movie.time) {
-    return `⏱ ${movie.time}`;
+  // Kiểm tra movie có hợp lệ không
+  if (!movie || typeof movie !== 'object') {
+    return '⭐ N/A';
+  }
+
+  // Hiển thị thời lượng cho phim lẻ (ưu tiên field mới)
+  if (showDuration && (movie.duration || movie.time)) {
+    const duration = movie.duration ? `${movie.duration} phút` : String(movie.time);
+    return `⏱ ${duration}`;
   }
   
-  // Hiển thị số tập cho phim bộ
-  if (movie.episode_total) {
-    return `📺 ${movie.episode_total} tập`;
+  // Hiển thị số tập cho phim bộ (ưu tiên field mới)
+  if (movie.totalEpisodes || movie.episode_total) {
+    const episodes = movie.totalEpisodes || movie.episode_total;
+    return `📺 ${String(episodes)} tập`;
   }
   
-  if (movie.episode_current) {
-    return `📺 ${movie.episode_current}`;
+  if (movie.currentEpisode || movie.episode_current) {
+    const current = movie.currentEpisode || movie.episode_current;
+    return `📺 ${String(current)}`;
   }
   
-  // Mặc định hiển thị năm
-  return `⭐ ${movie.year || 'N/A'}`;
+  // Mặc định hiển thị năm - đảm bảo luôn trả về string
+  return `⭐ ${String(movie.year || 'N/A')}`;
 };
 
 /**
@@ -33,7 +41,14 @@ export const getMovieDisplayInfo = (movie: Movie, showDuration: boolean = false)
  * @returns Tên phim
  */
 export const getMovieTitle = (movie: Movie): string => {
-  return movie.name || movie.origin_name || 'Không có tên';
+  // Kiểm tra movie có hợp lệ không
+  if (!movie || typeof movie !== 'object') {
+    return 'Không có tên';
+  }
+  
+  // Lấy tên từ các field khác nhau và đảm bảo trả về string
+  const title = movie.title || movie.name || movie.originalTitle || movie.origin_name;
+  return String(title || 'Không có tên');
 };
 
 /**
@@ -43,7 +58,7 @@ export const getMovieTitle = (movie: Movie): string => {
  * @returns Mô tả phim đã được làm sạch
  */
 export const getMovieDescription = (movie: Movie, maxLength?: number): string => {
-  let description = movie.content?.replace(/<[^>]*>/g, '') || 'Mô tả không có sẵn';
+  let description = (movie.description || movie.content)?.replace(/<[^>]*>/g, '') || 'Mô tả không có sẵn';
   
   if (maxLength && description.length > maxLength) {
     description = description.substring(0, maxLength) + '...';
@@ -59,9 +74,30 @@ export const getMovieDescription = (movie: Movie, maxLength?: number): string =>
  * @returns Mảng tên thể loại
  */
 export const getMovieGenres = (movie: Movie, limit?: number): string[] => {
-  if (!movie.category) return [];
+  // Kiểm tra movie có hợp lệ không
+  if (!movie || typeof movie !== 'object') {
+    return [];
+  }
+
+  // Ưu tiên field mới
+  if (movie.genres && Array.isArray(movie.genres)) {
+    const genres = movie.genres.map(genre => 
+      typeof genre === 'object' && genre !== null 
+        ? ((genre as any).name || (genre as any).title || String(genre))
+        : String(genre || '')
+    );
+    return limit ? genres.slice(0, limit) : genres;
+  }
   
-  const genres = movie.category.map(cat => cat.name);
+  // Fallback sang categories
+  if (!movie.categories || !Array.isArray(movie.categories)) return [];
+  
+  const genres = movie.categories.map((cat: any) => {
+    if (typeof cat === 'object' && cat !== null) {
+      return cat.name || cat.title || String(cat);
+    }
+    return String(cat || '');
+  }).filter(Boolean); // Loại bỏ string rỗng
   
   return limit ? genres.slice(0, limit) : genres;
 };
@@ -72,7 +108,17 @@ export const getMovieGenres = (movie: Movie, limit?: number): string[] => {
  * @returns Tên quốc gia hoặc chuỗi rỗng
  */
 export const getMovieCountry = (movie: Movie): string => {
-  return movie.country?.[0]?.name || '';
+  // Ưu tiên field mới
+  if (movie.country && typeof movie.country === 'string') {
+    return movie.country;
+  }
+  
+  // Fallback sang field cũ (array)
+  if (movie.countryData && Array.isArray(movie.countryData)) {
+    return movie.countryData[0]?.name || '';
+  }
+  
+  return '';
 };
 
 /**
@@ -81,6 +127,11 @@ export const getMovieCountry = (movie: Movie): string => {
  * @returns true nếu là phim bộ
  */
 export const isSeriesMovie = (movie: Movie): boolean => {
+  // Ưu tiên field mới
+  if (movie.totalEpisodes && movie.totalEpisodes > 1) return true;
+  if (movie.type === 'series' || movie.type === 'tv') return true;
+  
+  // Fallback sang field cũ
   return !!(movie.episode_total || movie.episode_current);
 };
 

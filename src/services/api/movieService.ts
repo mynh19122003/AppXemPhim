@@ -1,45 +1,87 @@
-// services/api/movieService.ts - Service xử lý API liên quan đến phim
+// Base URL API cho dự án
+const API_BASE_URL = 'https://phimapi.com';
 
-import { API_CONFIG, DEFAULT_PARAMS } from './config';
-import { ApiResponse, Movie, MovieDetailResponse } from '../../types/movie';
+export interface Episode {
+  name: string;
+  slug: string;
+  filename: string;
+  link_embed: string;
+  link_m3u8: string;
+}
 
-/**
- * Class chứa các hàm gọi API liên quan đến phim
- */
+export interface EpisodeServer {
+  server_name: string;
+  server_data: Episode[];
+}
+
+export interface MovieDetail {
+  _id: string;
+  name: string;
+  slug: string;
+  origin_name: string;
+  content: string;
+  type: string;
+  status: string;
+  poster_url: string;
+  thumb_url: string;
+  year: number;
+}
+
+export interface MovieDetailResponse {
+  status: boolean;
+  msg: string;
+  movie: MovieDetail;
+  episodes?: EpisodeServer[];
+}
+
+export interface MoviesListResponse {
+  status: boolean;
+  msg: string;
+  data: {
+    items: MovieDetail[];
+    params: {
+      pagination: {
+        totalItems: number;
+        totalItemsPerPage: number;
+        currentPage: number;
+        totalPages: number;
+      };
+    };
+  };
+}
+
+export interface NewMoviesResponse {
+  status: boolean;
+  msg: string;
+  items: MovieDetail[];
+  pagination: {
+    totalItems: number;
+    totalItemsPerPage: number;
+    currentPage: number;
+    totalPages: number;
+  };
+}
+
+export interface ApiOptions {
+  page?: number;
+  limit?: number;
+  sort_field?: 'modified.time' | '_id' | 'year';
+  sort_type?: 'desc' | 'asc';
+  sort_lang?: 'vietsub' | 'thuyet-minh' | 'long-tieng';
+  category?: string;
+  country?: string;
+  year?: number;
+}
+
 class MovieService {
-  
-  /**
-   * Tạo URL đầy đủ cho API request
-   * @param endpoint - Endpoint API
-   * @param params - Các tham số query
-   */
-  private buildUrl(endpoint: string, params: Record<string, any> = {}): string {
-    const url = new URL(API_CONFIG.BASE_URL + endpoint);
-    
-    // Thêm các tham số mặc định
-    const allParams: Record<string, any> = { ...DEFAULT_PARAMS, ...params };
-    
-    Object.keys(allParams).forEach(key => {
-      const value = allParams[key];
-      if (value !== undefined && value !== null) {
-        url.searchParams.append(key, String(value));
-      }
-    });
-    
-    return url.toString();
-  }
-
-  /**
-   * Gọi API và xử lý response
-   * @param url - URL API
-   */
   private async fetchData<T>(url: string): Promise<T> {
     try {
-      console.log('🌐 Đang gọi API:', url);
+      console.log('🌐 Gọi API:', url);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       });
@@ -49,237 +91,355 @@ class MovieService {
       }
 
       const data = await response.json();
-      console.log('✅ API response thành công');
-      return data;
+      console.log('✅ API Response thành công');
       
+      return data;
     } catch (error) {
-      console.error('❌ Lỗi khi gọi API:', error);
+      console.error('❌ Lỗi API:', error);
       throw error;
     }
   }
 
   /**
-   * Lấy danh sách phim mới cập nhật
-   * @param page - Số trang (mặc định: 1)
+   * Build query string từ options
    */
-  async getNewMovies(page: number = 1): Promise<Movie[]> {
+  private buildQueryString(options: ApiOptions): string {
+    const params: string[] = [];
+    
+    if (options.page) params.push(`page=${options.page}`);
+    if (options.limit) params.push(`limit=${options.limit}`);
+    if (options.sort_field) params.push(`sort_field=${options.sort_field}`);
+    if (options.sort_type) params.push(`sort_type=${options.sort_type}`);
+    if (options.sort_lang) params.push(`sort_lang=${options.sort_lang}`);
+    if (options.category) params.push(`category=${options.category}`);
+    if (options.country) params.push(`country=${options.country}`);
+    if (options.year) params.push(`year=${options.year}`);
+    
+    return params.length > 0 ? `?${params.join('&')}` : '';
+  }
+
+  async getNewMovies(page: number = 1): Promise<MoviesListResponse | null> {
     try {
-      const url = this.buildUrl(API_CONFIG.ENDPOINTS.NEW_MOVIES, { page });
-      const response: any = await this.fetchData(url);
-      
-      // API "phim-moi-cap-nhat" trả về items trực tiếp
-      if (response.status && response.items) {
-        console.log(`📽️ Lấy được ${response.items.length} phim mới (trang ${page})`);
-        return response.items;
+      // Thử phiên bản v3 trước (theo documentation có nhiều kết quả khác nhau)
+      try {
+        const urlV3 = `${API_BASE_URL}/danh-sach/phim-moi-cap-nhat-v3?page=${page}`;
+        const responseV3 = await this.fetchData<NewMoviesResponse>(urlV3);
+        
+        if (responseV3 && responseV3.items && responseV3.items.length > 0) {
+          console.log('✅ Sử dụng API v3 cho phim mới');
+          return this.convertNewMoviesResponse(responseV3);
+        }
+      } catch (errorV3) {
+        console.log('⚠️ API v3 không khả dụng, thử v2...');
       }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ Lỗi khi lấy phim mới:', error);
-      return [];
-    }
-  }
 
-  /**
-   * Lấy danh sách phim lẻ
-   * @param page - Số trang
-   */
-  async getSingleMovies(page: number = 1): Promise<Movie[]> {
-    try {
-      const url = this.buildUrl(API_CONFIG.ENDPOINTS.SINGLE_MOVIES, { page });
-      const response: any = await this.fetchData(url);
-      
-      // API v1 trả về response.data.items
-      if (response.status && response.data?.items) {
-        console.log(`🎬 Lấy được ${response.data.items.length} phim lẻ (trang ${page})`);
+      // Fallback sang v2
+      try {
+        const urlV2 = `${API_BASE_URL}/danh-sach/phim-moi-cap-nhat-v2?page=${page}`;
+        const responseV2 = await this.fetchData<NewMoviesResponse>(urlV2);
         
-        // Fix URLs ảnh bị thiếu domain
-        const fixedMovies = response.data.items.map((movie: any) => ({
-          ...movie,
-          poster_url: movie.poster_url?.startsWith('http') 
-            ? movie.poster_url 
-            : `https://phimimg.com/${movie.poster_url}`,
-          thumb_url: movie.thumb_url?.startsWith('http') 
-            ? movie.thumb_url 
-            : `https://phimimg.com/${movie.thumb_url}`,
-        }));
-        
-        return fixedMovies;
+        if (responseV2 && responseV2.items && responseV2.items.length > 0) {
+          console.log('✅ Sử dụng API v2 cho phim mới');
+          return this.convertNewMoviesResponse(responseV2);
+        }
+      } catch (errorV2) {
+        console.log('⚠️ API v2 không khả dụng, thử v1...');
       }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ Lỗi khi lấy phim lẻ:', error);
-      return [];
-    }
-  }
 
-  /**
-   * Lấy danh sách phim bộ
-   * @param page - Số trang
-   */
-  async getSeriesMovies(page: number = 1): Promise<Movie[]> {
-    try {
-      const url = this.buildUrl(API_CONFIG.ENDPOINTS.SERIES_MOVIES, { page });
-      const response: any = await this.fetchData(url);
+      // Fallback cuối cùng sang v1 (original)
+      const urlV1 = `${API_BASE_URL}/danh-sach/phim-moi-cap-nhat?page=${page}`;
+      const responseV1 = await this.fetchData<NewMoviesResponse>(urlV1);
       
-      // API v1 trả về response.data.items
-      if (response.status && response.data?.items) {
-        console.log(`📺 Lấy được ${response.data.items.length} phim bộ (trang ${page})`);
-        
-        // Fix URLs ảnh bị thiếu domain
-        const fixedMovies = response.data.items.map((movie: any) => ({
-          ...movie,
-          poster_url: movie.poster_url?.startsWith('http') 
-            ? movie.poster_url 
-            : `https://phimimg.com/${movie.poster_url}`,
-          thumb_url: movie.thumb_url?.startsWith('http') 
-            ? movie.thumb_url 
-            : `https://phimimg.com/${movie.thumb_url}`,
-        }));
-        
-        return fixedMovies;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ Lỗi khi lấy phim bộ:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Lấy danh sách phim hoạt hình/anime
-   * @param page - Số trang
-   */
-  async getAnimeMovies(page: number = 1): Promise<Movie[]> {
-    try {
-      const url = this.buildUrl(API_CONFIG.ENDPOINTS.ANIME_MOVIES, { page });
-      const response: any = await this.fetchData(url);
-      
-      // API v1 trả về cấu trúc khác: response.data.items thay vì response.items
-      if (response.status && response.data?.items) {
-        console.log(`🎌 Lấy được ${response.data.items.length} phim anime (trang ${page})`);
-        
-        // Fix URLs ảnh bị thiếu domain
-        const fixedMovies = response.data.items.map((movie: any) => ({
-          ...movie,
-          poster_url: movie.poster_url?.startsWith('http') 
-            ? movie.poster_url 
-            : `https://phimimg.com/${movie.poster_url}`,
-          thumb_url: movie.thumb_url?.startsWith('http') 
-            ? movie.thumb_url 
-            : `https://phimimg.com/${movie.thumb_url}`,
-        }));
-        
-        return fixedMovies;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ Lỗi khi lấy phim anime:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Lấy phim theo quốc gia
-   * @param countrySlug - Slug quốc gia (vd: 'au-my', 'han-quoc')
-   * @param page - Số trang
-   */
-  async getMoviesByCountry(countrySlug: string, page: number = 1): Promise<Movie[]> {
-    try {
-      // Build URL manually cho country endpoint
-      const endpoint = `/v1/api/quoc-gia/${countrySlug}`;
-      const url = this.buildUrl(endpoint, { page });
-      const response: any = await this.fetchData(url);
-      
-      // API v1 trả về response.data.items
-      if (response.status && response.data?.items) {
-        console.log(`🌍 Lấy được ${response.data.items.length} phim ${countrySlug} (trang ${page})`);
-        
-        // Fix URLs ảnh bị thiếu domain
-        const fixedMovies = response.data.items.map((movie: any) => ({
-          ...movie,
-          poster_url: movie.poster_url?.startsWith('http') 
-            ? movie.poster_url 
-            : `https://phimimg.com/${movie.poster_url}`,
-          thumb_url: movie.thumb_url?.startsWith('http') 
-            ? movie.thumb_url 
-            : `https://phimimg.com/${movie.thumb_url}`,
-        }));
-        
-        return fixedMovies;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error(`❌ Lỗi khi lấy phim ${countrySlug}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Lấy phim US-UK
-   */
-  async getUSUKMovies(page: number = 1): Promise<Movie[]> {
-    return this.getMoviesByCountry(API_CONFIG.COUNTRIES.US, page);
-  }
-
-  /**
-   * Lấy phim Hàn Quốc
-   */
-  async getKoreanMovies(page: number = 1): Promise<Movie[]> {
-    return this.getMoviesByCountry(API_CONFIG.COUNTRIES.KOREA, page);
-  }
-
-  /**
-   * Tìm kiếm phim
-   * @param keyword - Từ khóa tìm kiếm
-   * @param page - Số trang
-   */
-  async searchMovies(keyword: string, page: number = 1): Promise<Movie[]> {
-    try {
-      const url = this.buildUrl(API_CONFIG.ENDPOINTS.SEARCH, { 
-        keyword: encodeURIComponent(keyword),
-        page 
-      });
-      const response: ApiResponse = await this.fetchData(url);
-      
-      if (response.status && response.data?.items) {
-        console.log(`🔍 Tìm được ${response.data.items.length} kết quả cho "${keyword}"`);
-        return response.data.items;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error(`❌ Lỗi khi tìm kiếm "${keyword}":`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Lấy chi tiết phim
-   * @param slug - Slug của phim
-   */
-  async getMovieDetail(slug: string): Promise<Movie | null> {
-    try {
-      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.MOVIE_DETAIL}/${slug}`;
-      const response: MovieDetailResponse = await this.fetchData(url);
-      
-      if (response.status && response.movie) {
-        console.log(`🎬 Lấy chi tiết phim: ${response.movie.name}`);
-        return response.movie;
+      if (responseV1 && responseV1.items) {
+        console.log('✅ Sử dụng API v1 cho phim mới');
+        return this.convertNewMoviesResponse(responseV1);
       }
       
       return null;
     } catch (error) {
-      console.error(`❌ Lỗi khi lấy chi tiết phim ${slug}:`, error);
+      console.error('❌ Lỗi lấy danh sách phim mới (tất cả phiên bản):', error);
+      return null;
+    }
+  }
+
+  /**
+   * Helper method để convert NewMoviesResponse sang MoviesListResponse
+   */
+  private convertNewMoviesResponse(response: NewMoviesResponse): MoviesListResponse {
+    return {
+      status: response.status,
+      msg: response.msg,
+      data: {
+        items: response.items,
+        params: {
+          pagination: response.pagination
+        }
+      }
+    };
+  }
+
+  async getSingleMovies(options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/danh-sach/phim-le${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy phim lẻ:', error);
+      return null;
+    }
+  }
+
+  async getSeriesMovies(options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/danh-sach/phim-bo${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy phim bộ:', error);
+      return null;
+    }
+  }
+
+  async getAnimeMovies(options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        // Filter để chỉ lấy hoạt hình Nhật Bản
+        country: 'nhat-ban',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      // Sử dụng endpoint hoạt hình với filter quốc gia Nhật Bản
+      const url = `${API_BASE_URL}/v1/api/danh-sach/hoat-hinh${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy anime Nhật Bản:', error);
+      return null;
+    }
+  }
+
+  async getKoreanMovies(options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/quoc-gia/han-quoc${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy phim Hàn Quốc:', error);
+      return null;
+    }
+  }
+
+  async getUSUKMovies(options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/quoc-gia/au-my${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy phim Âu Mỹ:', error);
+      return null;
+    }
+  }
+
+  async searchMovies(keyword: string, options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      // Đúng theo documentation: keyword làm parameter đầu tiên, các params khác nối bằng &
+      const url = `${API_BASE_URL}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}${queryString ? '&' + queryString.substring(1) : ''}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error('❌ Lỗi tìm kiếm phim:', error);
+      return null;
+    }
+  }
+
+  async getMoviesByCategory(categorySlug: string, options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/the-loai/${categorySlug}${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error(`❌ Lỗi lấy phim thể loại ${categorySlug}:`, error);
+      return null;
+    }
+  }
+
+  async getMoviesByCountry(countrySlug: string, options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/quoc-gia/${countrySlug}${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error(`❌ Lỗi lấy phim quốc gia ${countrySlug}:`, error);
+      return null;
+    }
+  }
+
+  async getMoviesByYear(year: number, options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/nam/${year}${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error(`❌ Lỗi lấy phim năm ${year}:`, error);
+      return null;
+    }
+  }
+
+  async getCategories(): Promise<any> {
+    try {
+      const url = `${API_BASE_URL}/the-loai`;
+      return await this.fetchData(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy danh sách thể loại:', error);
+      return null;
+    }
+  }
+
+  async getCountries(): Promise<any> {
+    try {
+      const url = `${API_BASE_URL}/quoc-gia`;
+      return await this.fetchData(url);
+    } catch (error) {
+      console.error('❌ Lỗi lấy danh sách quốc gia:', error);
+      return null;
+    }
+  }
+
+  // ===== ADDITIONAL API METHODS =====
+
+  /**
+   * Lấy danh sách phim theo type_list với options đầy đủ
+   * type_list: phim-bo, phim-le, tv-shows, hoat-hinh, phim-vietsub, phim-thuyet-minh, phim-long-tieng
+   */
+  async getMoviesByType(typeList: string, options: ApiOptions = {}): Promise<MoviesListResponse | null> {
+    try {
+      const defaultOptions: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...options
+      };
+      
+      const queryString = this.buildQueryString(defaultOptions);
+      const url = `${API_BASE_URL}/v1/api/danh-sach/${typeList}${queryString}`;
+      return await this.fetchData<MoviesListResponse>(url);
+    } catch (error) {
+      console.error(`❌ Lỗi lấy phim type ${typeList}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Lấy phim theo TMDB ID
+   */
+  async getMovieByTMDB(type: 'tv' | 'movie', id: number): Promise<any> {
+    try {
+      const url = `${API_BASE_URL}/tmdb/${type}/${id}`;
+      return await this.fetchData(url);
+    } catch (error) {
+      console.error(`❌ Lỗi lấy phim TMDB ${type}/${id}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Advanced search với tất cả filters
+   */
+  async advancedSearch(keyword: string, filters: {
+    sort_lang?: 'vietsub' | 'thuyet-minh' | 'long-tieng';
+    category?: string;
+    country?: string;
+    year?: number;
+    page?: number;
+    limit?: number;
+    sort_field?: 'modified.time' | '_id' | 'year';
+    sort_type?: 'desc' | 'asc';
+  } = {}): Promise<MoviesListResponse | null> {
+    try {
+      const options: ApiOptions = {
+        page: 1,
+        limit: 20,
+        sort_field: 'modified.time',
+        sort_type: 'desc',
+        ...filters
+      };
+      
+      return await this.searchMovies(keyword, options);
+    } catch (error) {
+      console.error('❌ Lỗi advanced search:', error);
       return null;
     }
   }
 }
 
-// Export singleton instance
-export const movieService = new MovieService();
+const movieService = new MovieService();
 export default movieService;
